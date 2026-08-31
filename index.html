@@ -52,18 +52,39 @@
   }
   .iconbtn:active{background:#2a241c}
   .searchrow{display:flex;gap:8px;margin-top:9px}
+  .qwrap{position:relative;flex:1;display:flex}
   #q{
     flex:1;background:#100e0b;border:1px solid var(--line);border-radius:6px;
-    padding:11px 12px;font-size:16px;
+    padding:11px 36px 11px 12px;font-size:16px;min-width:0;
   }
   #q::placeholder{color:#5f5648}
+  #q::-webkit-search-cancel-button,#q::-webkit-search-decoration{-webkit-appearance:none}
+  #qclear{
+    position:absolute;right:4px;top:50%;transform:translateY(-50%);
+    width:30px;height:30px;border:0;background:transparent;color:var(--dim);
+    font-size:22px;line-height:1;cursor:pointer;border-radius:50%;padding:0;
+  }
+  #qclear:hover,#qclear:focus-visible{color:var(--text);outline:none}
   #q:focus,#port:focus,.iconbtn:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
   #count{color:var(--dim);font-size:12px;margin-top:7px;display:flex;justify-content:space-between}
 
   /* ---- list ---- */
+  #scrollwrap{flex:1 1 auto;display:flex;min-height:0}
   #scroller{flex:1 1 auto;overflow-y:auto;position:relative;-webkit-overflow-scrolling:touch}
   #sizer{position:relative;width:100%}
   #rows{position:absolute;top:0;left:0;right:0}
+  #alpha{
+    flex:0 0 auto;display:flex;flex-direction:column;justify-content:space-between;
+    padding:6px 4px;font-size:10px;font-weight:600;color:var(--dim);
+    background:linear-gradient(90deg,transparent,rgba(30,26,21,.6) 40%);
+    touch-action:none;user-select:none;-webkit-user-select:none;
+  }
+  #alpha .l{
+    padding:1px 6px;line-height:1.05;letter-spacing:.05em;text-align:center;
+    pointer-events:none;
+  }
+  #alpha .l.dim{opacity:.25}
+  #alpha .l.hit{color:var(--amber)}
   .row{
     height:var(--row);display:flex;align-items:center;gap:10px;
     padding:0 12px;border-bottom:1px solid #241f19;cursor:pointer;
@@ -141,14 +162,20 @@
     <button class="iconbtn" id="setbtn" title="Settings">⚙</button>
   </div>
   <div class="searchrow">
-    <input id="q" type="search" placeholder="Search patches" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+    <div class="qwrap">
+      <input id="q" type="search" placeholder="Search patches" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+      <button id="qclear" type="button" hidden aria-label="Clear search">×</button>
+    </div>
     <button class="iconbtn" id="favfilter" title="Favourites only">★</button>
   </div>
   <div id="count"><span id="countl">No library loaded</span><span id="countr" class="mono"></span></div>
 </header>
 
-<div id="scroller" hidden>
-  <div id="sizer"><div id="rows"></div></div>
+<div id="scrollwrap" hidden>
+  <div id="scroller">
+    <div id="sizer"><div id="rows"></div></div>
+  </div>
+  <div id="alpha"></div>
 </div>
 
 <div id="empty">
@@ -463,15 +490,18 @@ const emptyEl = document.getElementById("empty");
 /* ------------------------------------------------------------------ *
  * List rendering (windowed — 9000 rows will not survive a full render) *
  * ------------------------------------------------------------------ */
+const scrollwrap = document.getElementById("scrollwrap");
 const scroller = document.getElementById("scroller");
 const sizer = document.getElementById("sizer");
 const rowsEl = document.getElementById("rows");
+const alphaEl = document.getElementById("alpha");
 const ROW = 68;
 let favOnly = false;
+let letterFirst = {};   // uppercase letter → first index in `view`
 
 function showLibrary() {
   emptyEl.hidden = true;
-  scroller.hidden = false;
+  scrollwrap.hidden = false;
   patches.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
   applyFilter();
   say(output ? "Ready — " + output.name : "Choose a MIDI output above", output ? "ok" : "");
@@ -495,9 +525,63 @@ function applyFilter() {
       ? patches.length.toLocaleString() + " patches"
       : view.length.toLocaleString() + " of " + patches.length.toLocaleString();
   document.getElementById("countr").textContent = favs.size ? favs.size + " ★" : "";
+  buildAlpha();
   draw();
   updateSendBtn();
 }
+
+/* alphabetical jump strip — the only sane way to move through 9000 rows on a
+ * touchscreen; the native scrollbar is a sliver under the thumb.            */
+const LETTERS = "#ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+function bucketOf(name) {
+  const c = name.charAt(0).toUpperCase();
+  return /[A-Z]/.test(c) ? c : "#";
+}
+function buildAlpha() {
+  letterFirst = {};
+  for (let i = 0; i < view.length; i++) {
+    const key = bucketOf(patches[view[i]].name);
+    if (!(key in letterFirst)) letterFirst[key] = i;
+  }
+  let html = "";
+  for (const L of LETTERS) {
+    const has = L in letterFirst;
+    html += '<div class="l' + (has ? "" : " dim") + '" data-l="' + L + '">' + L + '</div>';
+  }
+  alphaEl.innerHTML = html;
+  alphaEl.hidden = view.length < 30;
+}
+
+function alphaJump(clientY) {
+  const els = alphaEl.children;
+  if (!els.length) return;
+  const first = els[0].getBoundingClientRect().top;
+  const last = els[els.length - 1].getBoundingClientRect().bottom;
+  const y = Math.max(first, Math.min(last, clientY));
+  const idx = Math.floor((y - first) / ((last - first) / els.length));
+  const el = els[Math.max(0, Math.min(els.length - 1, idx))];
+  const L = el.dataset.l;
+  if (L in letterFirst) {
+    scroller.scrollTop = letterFirst[L] * ROW;
+    // brief highlight
+    for (const c of els) c.classList.remove("hit");
+    el.classList.add("hit");
+  }
+}
+let alphaDrag = false;
+alphaEl.addEventListener("pointerdown", e => {
+  alphaDrag = true;
+  try { alphaEl.setPointerCapture(e.pointerId); } catch {}
+  alphaJump(e.clientY);
+  e.preventDefault();
+});
+alphaEl.addEventListener("pointermove", e => {
+  if (!alphaDrag) return;
+  alphaJump(e.clientY);
+});
+const alphaEnd = () => { alphaDrag = false; };
+alphaEl.addEventListener("pointerup", alphaEnd);
+alphaEl.addEventListener("pointercancel", alphaEnd);
 
 function draw() {
   const top = scroller.scrollTop;
@@ -563,9 +647,18 @@ function updateSendBtn() {
  * Controls                                                            *
  * ------------------------------------------------------------------ */
 let searchTimer;
-document.getElementById("q").addEventListener("input", () => {
+const qEl = document.getElementById("q");
+const qClearBtn = document.getElementById("qclear");
+qEl.addEventListener("input", () => {
+  qClearBtn.hidden = !qEl.value;
   clearTimeout(searchTimer);
   searchTimer = setTimeout(applyFilter, 90);
+});
+qClearBtn.addEventListener("click", () => {
+  qEl.value = "";
+  qClearBtn.hidden = true;
+  applyFilter();
+  qEl.focus();
 });
 
 document.getElementById("favfilter").addEventListener("click", e => {
