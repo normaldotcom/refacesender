@@ -1,0 +1,17 @@
+{
+  "name": "reface DX patch sender",
+  "short_name": "reface DX",
+  "description": "Browse a patch library and send voices to a Yamaha reface DX over MIDI.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#14120f",
+  "theme_color": "#14120f",
+  "categories": ["music", "utilities"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

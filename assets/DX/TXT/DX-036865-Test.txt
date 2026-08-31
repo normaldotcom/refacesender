@@ -1,0 +1,54 @@
+VOICE NAME     = Test      
+============================
+TRANSPOSE      =        0
+MONO/POLY      =     Poly
+PORTA TIME     =        0
+PB RANGE       =       12
+ALGORITHM      =        8
+LFO WAVE       = Sawtooth Up
+LFO SPEED      =      127
+LFO DELAY      =      121
+LFO PMD        =       93
+PEG RATE 1     =       66
+PEG RATE 2     =       53
+PEG RATE 3     =       31
+PEG RATE 4     =       52
+PEG LEVEL 1    =        0
+PEG LEVEL 2    =       -6
+PEG LEVEL 3    =        0
+PEG LEVEL 4    =        0
+FX1 TYPE       =        1 (Distortion)
+FX1 PARAM 1    =       30 (Drive)
+FX1 PARAM 2    =        0 (Tone)
+FX2 TYPE       =        3 (Chorus)
+FX2 PARAM 1    =       55 (Depth)
+FX2 PARAM 2    =       16 (Rate)
+
+                      OP1      OP2      OP3      OP4     
+----------------------------------------------------
+OP Off/On      =       On       On       On       On
+EG RATE 1      =      127      127       22       66
+EG RATE 2      =       10      127       97        0
+EG RATE 3      =        0      127       99        0
+EG RATE 4      =        0      127       11        0
+EG LEVEL 1     =       78      127      127       95
+EG LEVEL 2     =      127      127      127      105
+EG LEVEL 3     =       83      127      127       84
+EG LEVEL 4     =       22        0        0       21
+RATE SCALING   =       59      110        0       46
+SCALING LD     =       40       59       65       14
+SCALING RD     =      103        0       55       33
+SCALING LC     =     -EXP     +EXP     +LIN     +EXP
+SCALING RC     =     +EXP     +LIN     -LIN     +EXP
+LFO AMD        =       62       20       32       67
+LFO PMD Off/On =       On       On       On       On
+PEG Off/On     =       On       On       On       On
+VELO SENS      =       15       80       80      107
+OUT LEVEL      =       78      113      109       87
+FEEDBACK       =       34        4       70       65
+FB TYPE        =   Square Sawtooth Sawtooth   Square
+FREQ MODE      =    Ratio    Ratio    Ratio    Ratio
+RATIO | FREQ   =      1.0     1.99      2.0      4.0
+   freq coarse =        1        1        2        4
+   freq fine   =        0       99        0        0
+FREQ DETUNE    =        0       21        0       13

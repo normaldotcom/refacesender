@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14120f">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>reface DX patch sender</title>
+<style>
+  :root{
+    --bg:#14120f;
+    --panel:#1e1a15;
+    --line:#332c23;
+    --text:#ece4d6;
+    --dim:#948875;
+    --amber:#f0a93b;
+    --bad:#d8654a;
+    --row:68px;
+    --safe-b:env(safe-area-inset-bottom, 0px);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;overscroll-behavior:none}
+  body{
+    background:var(--bg);color:var(--text);
+    font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;
+    font-size:16px;line-height:1.35;
+    display:flex;flex-direction:column;
+    -webkit-tap-highlight-color:transparent;
+  }
+  button,input,select{font:inherit;color:inherit}
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:12px;letter-spacing:.02em}
+
+  /* ---- header ---- */
+  header{
+    flex:0 0 auto;background:var(--panel);border-bottom:1px solid var(--line);
+    padding:10px 12px calc(10px + 0px);padding-top:calc(10px + env(safe-area-inset-top,0px));
+  }
+  .devrow{display:flex;align-items:center;gap:8px}
+  .lamp{width:9px;height:9px;border-radius:50%;background:#4a4137;flex:0 0 auto}
+  .lamp.on{background:var(--amber);box-shadow:0 0 8px rgba(240,169,59,.7)}
+  .lamp.err{background:var(--bad)}
+  #port{
+    flex:1 1 auto;min-width:0;background:transparent;border:1px solid var(--line);
+    border-radius:6px;padding:8px 6px;font-size:14px;
+  }
+  .iconbtn{
+    flex:0 0 auto;background:transparent;border:1px solid var(--line);border-radius:6px;
+    padding:8px 11px;font-size:14px;color:var(--dim);cursor:pointer
+  }
+  .iconbtn:active{background:#2a241c}
+  .searchrow{display:flex;gap:8px;margin-top:9px}
+  #q{
+    flex:1;background:#100e0b;border:1px solid var(--line);border-radius:6px;
+    padding:11px 12px;font-size:16px;
+  }
+  #q::placeholder{color:#5f5648}
+  #q:focus,#port:focus,.iconbtn:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+  #count{color:var(--dim);font-size:12px;margin-top:7px;display:flex;justify-content:space-between}
+
+  /* ---- list ---- */
+  #scroller{flex:1 1 auto;overflow-y:auto;position:relative;-webkit-overflow-scrolling:touch}
+  #sizer{position:relative;width:100%}
+  #rows{position:absolute;top:0;left:0;right:0}
+  .row{
+    height:var(--row);display:flex;align-items:center;gap:10px;
+    padding:0 12px;border-bottom:1px solid #241f19;cursor:pointer;
+  }
+  .row .nm{flex:1;min-width:0}
+  .row .t1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .t2{color:var(--dim);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .row.sel{background:#2b2318;box-shadow:inset 3px 0 0 var(--amber)}
+  .row.sending{background:#3a2c16}
+  .star{
+    flex:0 0 auto;width:40px;height:40px;border:0;background:transparent;
+    color:#4a4137;font-size:19px;line-height:1;cursor:pointer
+  }
+  .star.on{color:var(--amber)}
+  .info{
+    flex:0 0 auto;width:34px;height:34px;display:inline-flex;
+    align-items:center;justify-content:center;
+    color:#4a4137;font-size:18px;line-height:1;text-decoration:none;
+    margin-right:14px;border-radius:50%;
+  }
+  .info:hover,.info:focus-visible{color:var(--dim);outline:none}
+
+  /* ---- empty / loading ---- */
+  #empty{padding:26px 20px;max-width:44ch}
+  #empty h1{font-size:19px;font-weight:600;margin:0 0 10px}
+  #empty p{color:var(--dim);font-size:14px;margin:0 0 14px}
+  #empty.err h1{color:var(--bad)}
+
+  /* ---- footer ---- */
+  footer{
+    flex:0 0 auto;background:var(--panel);border-top:1px solid var(--line);
+    padding:10px 12px calc(10px + var(--safe-b));
+  }
+  #status{color:var(--dim);margin-bottom:9px;height:15px;white-space:nowrap;overflow:hidden}
+  #status.ok{color:var(--amber)}
+  #status.err{color:var(--bad)}
+  .sendrow{display:flex;gap:9px;align-items:stretch}
+  #send{
+    flex:1;background:var(--amber);color:#1a1409;border:0;border-radius:8px;
+    padding:17px;font-size:17px;font-weight:700;cursor:pointer
+  }
+  #send:disabled{background:#3a332a;color:#6b6155}
+  #send:active:not(:disabled){background:#d8942e}
+  #auto{
+    flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:3px;border:1px solid var(--line);border-radius:8px;padding:0 13px;
+    font-size:11px;color:var(--dim);cursor:pointer;background:transparent;text-align:center
+  }
+  #auto.on{border-color:var(--amber);color:var(--amber)}
+  #auto b{font-size:15px}
+
+  /* ---- settings sheet ---- */
+  dialog{
+    border:0;background:var(--panel);color:var(--text);border-radius:12px;
+    padding:18px;width:min(420px,92vw);
+  }
+  dialog::backdrop{background:rgba(0,0,0,.65)}
+  dialog h2{font-size:16px;margin:0 0 14px;font-weight:600}
+  .set{margin-bottom:16px}
+  .set label{display:block;font-size:14px;margin-bottom:5px}
+  .set small{display:block;color:var(--dim);font-size:12px;margin-top:4px}
+  .set input[type=range]{width:100%;accent-color:var(--amber)}
+  .util{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .util button{background:transparent;border:1px solid var(--line);border-radius:7px;padding:10px 12px;font-size:13px;cursor:pointer}
+  #closeset{width:100%;background:var(--amber);color:#1a1409;border:0;border-radius:8px;padding:13px;font-weight:600;cursor:pointer}
+  a{color:var(--amber)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="devrow">
+    <span class="lamp" id="lamp"></span>
+    <select id="port"><option>No MIDI access yet</option></select>
+    <button class="iconbtn" id="setbtn" title="Settings">⚙</button>
+  </div>
+  <div class="searchrow">
+    <input id="q" type="search" placeholder="Search patches" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+    <button class="iconbtn" id="favfilter" title="Favourites only">★</button>
+  </div>
+  <div id="count"><span id="countl">No library loaded</span><span id="countr" class="mono"></span></div>
+</header>
+
+<div id="scroller" hidden>
+  <div id="sizer"><div id="rows"></div></div>
+</div>
+
+<div id="empty">
+  <h1 id="loadhead">Loading patch library…</h1>
+  <p id="loadmsg" class="mono">Fetching assets/DX/manifest.json</p>
+  <p style="margin-top:22px;font-size:12px">
+    Patches by the Soundmondo community, converted to SysEx and de-duplicated by Martin Tarenskeen —
+    <a href="https://soundmondo.martintarenskeen.nl/" target="_blank" rel="noopener">soundmondo.martintarenskeen.nl</a>
+  </p>
+</div>
+
+<footer>
+  <div id="status" class="mono">Connect the reface DX and grant MIDI access</div>
+  <div class="sendrow">
+    <button id="send" disabled>Send patch</button>
+    <button id="auto"><b>⇄</b>auto</button>
+  </div>
+</footer>
+
+<dialog id="settings">
+  <h2>Settings</h2>
+  <div class="set">
+    <label for="gap">Gap between messages: <span id="gapv" class="mono">20 ms</span></label>
+    <input id="gap" type="range" min="2" max="120" step="1" value="20">
+    <small>Raise this if patches arrive garbled or only partly load.</small>
+  </div>
+  <div class="util">
+    <button id="prep">Disable auto power-off</button>
+    <button id="panic">Stop all notes</button>
+  </div>
+  <div class="set">
+    <small id="diag" class="mono"></small>
+  </div>
+  <button id="closeset">Done</button>
+</dialog>
+
+<script>
+"use strict";
+
+/* ------------------------------------------------------------------ *
+ * tiny persistence that degrades to memory (sandboxed previews etc.)  *
+ * ------------------------------------------------------------------ */
+const mem = {};
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? (k in mem ? mem[k] : d) : v; } catch { return k in mem ? mem[k] : d; } },
+  set(k, v) { mem[k] = v; try { localStorage.setItem(k, v); } catch {} }
+};
+
+/* ------------------------------------------------------------------ *
+ * SysEx helpers                                                       *
+ * ------------------------------------------------------------------ */
+
+// A reface DX voice file holds several consecutive F0..F7 messages.
+// They must be sent one at a time; a whole file handed to send() throws.
+function splitSysex(bytes) {
+  const out = [];
+  let i = 0;
+  while (i < bytes.length) {
+    const start = bytes.indexOf(0xF0, i);
+    if (start === -1) break;
+    const end = bytes.indexOf(0xF7, start);
+    if (end === -1) break;
+    out.push(bytes.subarray(start, end + 1));
+    i = end + 1;
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------------ *
+ * MIDI                                                                *
+ * ------------------------------------------------------------------ */
+let access = null, output = null;
+const lamp = document.getElementById("lamp");
+const portSel = document.getElementById("port");
+const statusEl = document.getElementById("status");
+
+function say(msg, kind) {
+  statusEl.textContent = msg;
+  statusEl.className = "mono" + (kind ? " " + kind : "");
+}
+
+async function initMidi() {
+  if (!navigator.requestMIDIAccess) {
+    lamp.className = "lamp err";
+    say("This browser has no Web MIDI. Use Chrome or Edge.", "err");
+    return;
+  }
+  try {
+    access = await navigator.requestMIDIAccess({ sysex: true });
+  } catch (e) {
+    lamp.className = "lamp err";
+    say("MIDI access refused — reload and allow it", "err");
+    return;
+  }
+  access.onstatechange = refreshPorts;
+  refreshPorts();
+}
+
+function refreshPorts() {
+  const outs = [...access.outputs.values()];
+  const prev = output && output.id;
+  portSel.innerHTML = "";
+  if (!outs.length) {
+    portSel.innerHTML = "<option>No MIDI outputs found</option>";
+    output = null;
+    lamp.className = "lamp err";
+    say("Plug in the reface DX (USB host / OTG)", "err");
+    updateSendBtn();
+    return;
+  }
+  for (const o of outs) {
+    const opt = document.createElement("option");
+    opt.value = o.id;
+    opt.textContent = o.name;
+    portSel.appendChild(opt);
+  }
+
+  // Only honour a stored port if the user picked it by hand. Auto-selections
+  // must never become sticky, or one bad guess wins forever.
+  const wantedName = store.get("portName", "");
+  const manual = store.get("portManual", "0") === "1";
+  const pick =
+    (manual && outs.find(o => o.name === wantedName)) ||
+    outs.find(o => o.id === prev) ||
+    bestGuess(outs);
+
+  portSel.value = pick.id;
+  setPort(pick.id, false);
+}
+
+// Virtual loopback ports are usually enumerated first, so ranking beats
+// order. Anything reface-shaped wins; software ports lose.
+const VIRTUAL = /midi ?through|through port|loopmidi|loopbe|iac driver|rtmidi|virtual|microsoft gs|wavetable|fluid|timidity/i;
+const REFACE = /reface/i;
+const YAMAHA = /yamaha/i;
+
+function scorePort(o) {
+  if (REFACE.test(o.name)) return 100;
+  if (YAMAHA.test(o.name)) return 50;
+  if (VIRTUAL.test(o.name)) return -100;
+  return 0;
+}
+
+function bestGuess(outs) {
+  return outs.reduce((best, o) => scorePort(o) > scorePort(best) ? o : best, outs[0]);
+}
+
+function setPort(id, manual) {
+  output = access.outputs.get(id) || null;
+  if (output && manual) {
+    store.set("portName", output.name);
+    store.set("portManual", "1");
+  }
+  lamp.className = "lamp" + (output ? " on" : " err");
+  updateSendBtn();
+  if (!output) return;
+
+  if (scorePort(output) < 0) {
+    lamp.className = "lamp err";
+    say("⚠ " + output.name + " looks like a loopback, not the DX", "err");
+  } else if (REFACE.test(output.name)) {
+    say("Ready — " + output.name, "ok");
+  } else {
+    say("Selected " + output.name + " — no reface in the name", "");
+  }
+  probeDevice();
+}
+
+// Universal Identity Request. A reface answers with an Identity Reply carrying
+// Yamaha's manufacturer ID; a loopback just echoes the request straight back,
+// which is distinguishable because a reply has 06 02, not 06 01.
+let probeTimer = null, probeInput = null;
+function probeDevice() {
+  if (!output || !access.inputs || !access.inputs.size) return;
+  clearTimeout(probeTimer);
+  if (probeInput) probeInput.onmidimessage = null;
+
+  // Pair the input that best matches the chosen output by name.
+  const ins = [...access.inputs.values()];
+  probeInput = ins.find(i => i.name === output.name) ||
+               ins.find(i => REFACE.test(i.name) && REFACE.test(output.name)) ||
+               null;
+  if (!probeInput) return;
+
+  let answered = false;
+  probeInput.onmidimessage = e => {
+    const d = e.data;
+    if (d.length < 7 || d[0] !== 0xF0 || d[1] !== 0x7E) return;
+    if (d[3] === 0x06 && d[4] === 0x01) {   // our own request, echoed back
+      answered = true;
+      lamp.className = "lamp err";
+      say("⚠ that port loops back to us — not the DX", "err");
+      return;
+    }
+    if (d[3] === 0x06 && d[4] === 0x02) {   // genuine identity reply
+      answered = true;
+      const yamaha = d[5] === 0x43;
+      lamp.className = "lamp on";
+      say(yamaha ? "Confirmed Yamaha device on " + output.name
+                 : "Device replied, but not Yamaha (" + output.name + ")",
+          yamaha ? "ok" : "err");
+    }
+  };
+
+  try { output.send([0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7]); } catch {}
+  probeTimer = setTimeout(() => {
+    if (probeInput) probeInput.onmidimessage = null;
+    if (!answered && REFACE.test(output.name)) {
+      // Name says reface but nothing answered — usually fine, the DX only
+      // replies when MIDI Control is on.
+      say("Ready — " + output.name + " (no ID reply)", "ok");
+    }
+  }, 400);
+}
+
+portSel.addEventListener("change", () => setPort(portSel.value, true));
+
+/* ------------------------------------------------------------------ *
+ * Send engine                                                         *
+ * ------------------------------------------------------------------ */
+let gap = +store.get("gap", 20);
+
+function sendBytes(bytes, label) {
+  if (!output) { say("No MIDI output selected", "err"); return false; }
+  const msgs = splitSysex(bytes);
+  if (!msgs.length) { say("No SysEx found in that file", "err"); return false; }
+  const t0 = performance.now() + 8;
+  try {
+    // Schedule on the MIDI clock rather than setTimeout — spacing stays tight.
+    msgs.forEach((m, i) => output.send(m, t0 + i * gap));
+  } catch (e) {
+    say("Send failed: " + e.message, "err");
+    return false;
+  }
+  const total = Math.round(msgs.length * gap);
+  say((label || "Sent") + " · " + msgs.length + " msgs · " + total + " ms", "ok");
+  return true;
+}
+
+async function sendPatch(p) {
+  let bytes;
+  try {
+    bytes = await bytesFor(p);
+  } catch (e) {
+    say("Fetch failed: " + e.message, "err");
+    return;
+  }
+  const ok = sendBytes(bytes, p.name);
+  if (ok) {
+    const el = document.querySelector(".row.sel");
+    if (el) {
+      el.classList.add("sending");
+      setTimeout(() => el.classList.remove("sending"), 220);
+    }
+  }
+}
+
+document.getElementById("panic").onclick = () => {
+  if (!output) return;
+  for (let ch = 0; ch < 16; ch++) {
+    output.send([0xB0 | ch, 123, 0]);
+    output.send([0xB0 | ch, 120, 0]);
+  }
+  say("All notes off", "ok");
+};
+
+document.getElementById("prep").onclick = () => {
+  if (!output) return;
+  sendBytes(new Uint8Array([0xF0, 0x43, 0x10, 0x7F, 0x1C, 0x05, 0x00, 0x00, 0x0C, 0x00, 0xF7]), "Auto power-off disabled");
+};
+
+/* ------------------------------------------------------------------ *
+ * Patch library                                                       *
+ * ------------------------------------------------------------------ */
+// A patch is { name, file, folder, key, hay }. Bytes are fetched lazily
+// from assets/DX/SYX/<file> the first time the patch is sent, then cached
+// on the object so subsequent sends are instant.
+let patches = [];
+let view = [];              // filtered indices
+let selected = -1;
+
+async function bytesFor(p) {
+  if (p.bytes) return p.bytes;
+  const r = await fetch("assets/DX/SYX/" + encodeURIComponent(p.file));
+  if (!r.ok) throw new Error(p.file + " (" + r.status + ")");
+  p.bytes = new Uint8Array(await r.arrayBuffer());
+  return p.bytes;
+}
+
+let favs = new Set(JSON.parse(store.get("favs", "[]")));
+const saveFavs = () => store.set("favs", JSON.stringify([...favs]));
+
+async function tryManifest() {
+  try {
+    const r = await fetch("assets/DX/manifest.json", { cache: "force-cache" });
+    if (!r.ok) return false;
+    const idx = await r.json();
+    patches = idx.patches.map(p => {
+      const m = /^DX-0*(\d+)-/.exec(p.f);
+      return {
+        name: p.n, file: p.f, folder: p.d || "", key: (p.d || "") + "/" + p.f,
+        vid: m ? m[1] : null,
+        hay: (p.n + " " + p.f + " " + (p.d || "")).toLowerCase()
+      };
+    });
+    return patches.length > 0;
+  } catch { return false; }
+}
+
+const emptyEl = document.getElementById("empty");
+
+/* ------------------------------------------------------------------ *
+ * List rendering (windowed — 9000 rows will not survive a full render) *
+ * ------------------------------------------------------------------ */
+const scroller = document.getElementById("scroller");
+const sizer = document.getElementById("sizer");
+const rowsEl = document.getElementById("rows");
+const ROW = 68;
+let favOnly = false;
+
+function showLibrary() {
+  emptyEl.hidden = true;
+  scroller.hidden = false;
+  patches.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  applyFilter();
+  say(output ? "Ready — " + output.name : "Choose a MIDI output above", output ? "ok" : "");
+}
+
+function applyFilter() {
+  const q = document.getElementById("q").value.trim().toLowerCase();
+  const terms = q ? q.split(/\s+/) : [];
+  view = [];
+  for (let i = 0; i < patches.length; i++) {
+    const p = patches[i];
+    if (favOnly && !favs.has(p.key)) continue;
+    if (terms.length && !terms.every(t => p.hay.includes(t))) continue;
+    view.push(i);
+  }
+  selected = view.length ? 0 : -1;
+  sizer.style.height = (view.length * ROW) + "px";
+  scroller.scrollTop = 0;
+  document.getElementById("countl").textContent =
+    view.length === patches.length
+      ? patches.length.toLocaleString() + " patches"
+      : view.length.toLocaleString() + " of " + patches.length.toLocaleString();
+  document.getElementById("countr").textContent = favs.size ? favs.size + " ★" : "";
+  draw();
+  updateSendBtn();
+}
+
+function draw() {
+  const top = scroller.scrollTop;
+  const first = Math.max(0, Math.floor(top / ROW) - 4);
+  const visible = Math.ceil(scroller.clientHeight / ROW) + 8;
+  const last = Math.min(view.length, first + visible);
+  rowsEl.style.transform = "translateY(" + (first * ROW) + "px)";
+  let html = "";
+  for (let i = first; i < last; i++) {
+    const p = patches[view[i]];
+    const star = favs.has(p.key) ? "star on" : "star";
+    const info = p.vid
+      ? '<a class="info" href="https://soundmondo.yamahasynth.com/voices/' + p.vid +
+        '" target="_blank" rel="noopener" title="Open on Soundmondo" aria-label="Open patch on Soundmondo">&#9432;</a>'
+      : '';
+    html += '<div class="row' + (i === selected ? " sel" : "") + '" data-i="' + i + '">' +
+              '<div class="nm"><div class="t1"></div><div class="t2"></div></div>' +
+              info +
+              '<button class="' + star + '" data-fav="' + i + '">★</button>' +
+            '</div>';
+  }
+  rowsEl.innerHTML = html;
+  // set text content separately so patch names can't inject markup
+  let n = 0;
+  for (let i = first; i < last; i++, n++) {
+    const p = patches[view[i]];
+    const row = rowsEl.children[n];
+    row.querySelector(".t1").textContent = p.name;
+    row.querySelector(".t2").textContent = p.folder ? p.folder + " · " + p.file : p.file;
+  }
+}
+
+scroller.addEventListener("scroll", () => requestAnimationFrame(draw), { passive: true });
+window.addEventListener("resize", draw);
+
+rowsEl.addEventListener("click", e => {
+  if (e.target.closest("a.info")) return;   // let the link open; don't select or auto-send
+  const favBtn = e.target.closest("[data-fav]");
+  if (favBtn) {
+    const p = patches[view[+favBtn.dataset.fav]];
+    favs.has(p.key) ? favs.delete(p.key) : favs.add(p.key);
+    saveFavs();
+    if (favOnly) applyFilter(); else { draw(); document.getElementById("countr").textContent = favs.size ? favs.size + " ★" : ""; }
+    return;
+  }
+  const row = e.target.closest(".row");
+  if (!row) return;
+  select(+row.dataset.i);
+  if (autoSend) sendPatch(patches[view[selected]]);
+});
+
+function select(i) {
+  selected = i;
+  draw();
+  updateSendBtn();
+}
+
+function updateSendBtn() {
+  document.getElementById("send").disabled = !(output && selected >= 0 && view.length);
+}
+
+/* ------------------------------------------------------------------ *
+ * Controls                                                            *
+ * ------------------------------------------------------------------ */
+let searchTimer;
+document.getElementById("q").addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(applyFilter, 90);
+});
+
+document.getElementById("favfilter").addEventListener("click", e => {
+  favOnly = !favOnly;
+  e.currentTarget.style.color = favOnly ? "var(--amber)" : "var(--dim)";
+  e.currentTarget.style.borderColor = favOnly ? "var(--amber)" : "var(--line)";
+  applyFilter();
+});
+
+let autoSend = store.get("auto", "0") === "1";
+const autoBtn = document.getElementById("auto");
+if (autoSend) autoBtn.classList.add("on");
+autoBtn.addEventListener("click", () => {
+  autoSend = !autoSend;
+  autoBtn.classList.toggle("on", autoSend);
+  store.set("auto", autoSend ? "1" : "0");
+});
+
+document.getElementById("send").addEventListener("click", () => {
+  if (selected >= 0) sendPatch(patches[view[selected]]);
+});
+
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT" && e.key !== "Enter") return;
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    const next = Math.min(view.length - 1, Math.max(0, selected + (e.key === "ArrowDown" ? 1 : -1)));
+    select(next);
+    const y = next * ROW;
+    if (y < scroller.scrollTop) scroller.scrollTop = y;
+    else if (y + ROW > scroller.scrollTop + scroller.clientHeight) scroller.scrollTop = y + ROW - scroller.clientHeight;
+    if (autoSend) sendPatch(patches[view[selected]]);
+  } else if (e.key === "Enter" && selected >= 0) {
+    e.preventDefault();
+    sendPatch(patches[view[selected]]);
+  }
+});
+
+/* settings */
+const dlg = document.getElementById("settings");
+const gapIn = document.getElementById("gap");
+const gapV = document.getElementById("gapv");
+gapIn.value = gap;
+gapV.textContent = gap + " ms";
+gapIn.addEventListener("input", () => {
+  gap = +gapIn.value;
+  gapV.textContent = gap + " ms";
+  store.set("gap", gap);
+});
+document.getElementById("setbtn").onclick = () => {
+  document.getElementById("diag").textContent =
+    (patches.length ? patches.length + " patches" : "no library") +
+    " · secure context: " + window.isSecureContext;
+  dlg.showModal();
+};
+document.getElementById("closeset").onclick = () => dlg.close();
+
+/* ------------------------------------------------------------------ *
+ * Boot                                                                *
+ * ------------------------------------------------------------------ */
+(async function () {
+  await initMidi();
+  if (await tryManifest()) {
+    showLibrary();
+    cacheManifestOffline();
+  } else {
+    emptyEl.classList.add("err");
+    document.getElementById("loadhead").textContent = "Couldn't load patch library";
+    document.getElementById("loadmsg").textContent =
+      "assets/DX/manifest.json is missing or unreadable. Run: node build-manifest.mjs";
+  }
+})();
+
+const swSupported = "serviceWorker" in navigator &&
+  (location.protocol === "https:" || location.hostname === "localhost");
+
+if (swSupported) navigator.serviceWorker.register("sw.js").catch(() => {});
+
+async function cacheManifestOffline() {
+  if (!swSupported) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    if (reg.active) reg.active.postMessage("cache-manifest");
+  } catch {}
+}
+</script>
+</body>
+</html>
