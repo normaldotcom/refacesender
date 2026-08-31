@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#14120f">
+<meta name="color-scheme" content="dark">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
@@ -11,6 +12,7 @@
 <title>reface DX patch sender</title>
 <style>
   :root{
+    color-scheme:dark;
     --bg:#14120f;
     --panel:#1e1a15;
     --line:#332c23;
@@ -214,6 +216,9 @@
 
 <script>
 "use strict";
+
+// Keep in sync with VERSION in sw.js.
+const VERSION = "v3";
 
 /* ------------------------------------------------------------------ *
  * tiny persistence that degrades to memory (sandboxed previews etc.)  *
@@ -710,6 +715,7 @@ gapIn.addEventListener("input", () => {
 });
 document.getElementById("setbtn").onclick = () => {
   document.getElementById("diag").textContent =
+    VERSION + " · " +
     (patches.length ? patches.length + " patches" : "no library") +
     " · secure context: " + window.isSecureContext;
   dlg.showModal();

@@ -1,5 +1,5 @@
 // Bump this to push an update to installed copies.
-const VERSION = "v2";
+const VERSION = "v3";
 const SHELL = "shell-" + VERSION;
 const DATA = "patches-" + VERSION;
 
